@@ -1,0 +1,120 @@
+version: "0.1.0"
+
+metadata:
+  flow_type: "compound"
+  name: "content-moderation-enhancer"
+  description: "A comprehensive content processing pipeline that moderates, enhances, and finalizes user-submitted content"
+  author: "venmus"
+  tags: [content-moderation, content-enhancement, ai-writing]
+  private: false
+
+inputs:
+  content:
+    type: string
+    description: "The user-submitted content to be processed"
+    required: true
+    example: "This is a sample article about technology trends."
+  content_type:
+    type: string
+    description: "Type of content (article, social-post, product-description)"
+    required: true
+    example: "article"
+  tone:
+    type: string
+    description: "Desired tone for content enhancement"
+    required: false
+    example: "professional"
+
+workflow:
+  # First stage: Content Moderation
+  moderation_check: # First FLow
+    type: "custom"
+    inputs:
+      text: ${inputs.content}
+    model:
+      provider: "openai"
+      name: "gpt-4o"
+    prompt: |
+      Analyze the following content for:
+      1. Inappropriate language
+      2. Harmful content
+      3. Potential copyright issues
+      4. Factual accuracy
+
+      Content: {text}
+
+      Provide reponse in the following string format:
+        "is_safe": boolean,
+        "issues": [],
+        "risk_score": float (0-1)
+
+  # Parallel stage: Content Enhancement
+  content_enhancement: #Second FLow
+    type: "custom"
+    inputs:
+      original_text: ${inputs.content}
+      content_type: ${inputs.content_type}
+      tone: ${inputs.tone}
+    model:
+      provider: "openai"
+      name: "gpt-4o"
+    prompt: |
+      Enhance the following {content_type} while maintaining its core message.
+      Desired tone: {tone}
+
+      Original content: {original_text}
+
+      Improve:
+      1. Clarity and readability
+      2. Grammar and style
+      3. Engagement factor
+
+      Provide the enhanced content while preserving the original meaning.
+
+  # Final stage: Review and Combine
+  final_review:
+    type: "custom"
+    depends_on: [moderation_check, content_enhancement]
+    inputs:
+      moderation_result: ${moderation_check.output}
+      enhanced_content: ${content_enhancement.output}
+    model:
+      provider: "openai"
+      name: "gpt-4o"
+    prompt: |
+      Review the moderation results and enhanced content to create a final output.
+
+      Moderation results: {moderation_result}
+      Enhanced content: {enhanced_content}
+
+      Provide a response in the following string format:
+        "approved": boolean,
+        "final_content": string,
+        "moderation_summary": string,
+        "enhancement_summary": string
+
+output:
+  value:
+    - ${final_review.output}
+
+readme: |
+  # Content Moderation and Enhancement Pipeline
+
+  This compound flow processes user-submitted content through a comprehensive pipeline:
+
+  ### Workflow Stages:
+  1. **Content Moderation**: Checks for inappropriate content, harmful material, and potential issues
+  2. **Content Enhancement**: Improves the content while maintaining its core message
+  3. **Final Review**: Combines moderation and enhancement results into a final output
+
+  ### Usage:
+  - Submit content with required type and optional tone preferences
+  - Receives comprehensive analysis and enhanced content if approved
+  - Automatically flags potentially problematic content
+
+  ### Output Format:
+  JSON object containing:
+  - approved: Whether the content passed moderation
+  - final_content: The enhanced and approved content
+  - moderation_summary: Summary of moderation checks
+  - enhancement_summary: Summary of improvements made
